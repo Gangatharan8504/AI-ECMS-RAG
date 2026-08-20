@@ -1,14 +1,36 @@
 import os
 import re
 
-import faiss
+try:
+    import faiss
+except Exception:
+    faiss = None
+
 import numpy as np
-import fitz
-import pytesseract
+
+try:
+    import fitz
+except Exception:
+    fitz = None
+
+try:
+    import pytesseract
+except Exception:
+    pytesseract = None
 
 from PIL import Image
 from pypdf import PdfReader
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception:
+    SentenceTransformer = None
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+except Exception:
+    TfidfVectorizer = None
+
 from groq import Groq
 
 
@@ -22,10 +44,14 @@ _embedding_model = None
 def get_embedding_model():
     global _embedding_model
 
-    if _embedding_model is None:
-        _embedding_model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )
+    if _embedding_model is None and SentenceTransformer is not None:
+        try:
+            _embedding_model = SentenceTransformer(
+                "all-MiniLM-L6-v2"
+            )
+        except Exception as e:
+            print(f"SentenceTransformer fallback: {e}")
+            _embedding_model = None
 
     return _embedding_model
 
@@ -243,34 +269,42 @@ def create_chunks(
 # ============================================================
 
 def create_embeddings(chunks):
-
     if not chunks:
-        raise ValueError(
-            "No document chunks available."
-        )
+        raise ValueError("No document chunks available.")
 
     model = get_embedding_model()
+    texts = [chunk["text"] for chunk in chunks]
 
-    texts = [
-        chunk["text"]
-        for chunk in chunks
-    ]
+    if model is not None:
+        embeddings = model.encode(texts, convert_to_numpy=True)
+        embeddings = embeddings.astype("float32")
+        if faiss is not None:
+            faiss.normalize_L2(embeddings)
+        else:
+            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+            embeddings = embeddings / np.maximum(norms, 1e-12)
+        return embeddings
 
-    embeddings = model.encode(
-        texts,
-        convert_to_numpy=True
-    )
+    # Lightweight TF-IDF fallback if SentenceTransformer is not installed
+    if TfidfVectorizer is not None:
+        vectorizer = TfidfVectorizer(stop_words="english")
+        try:
+            tfidf_matrix = vectorizer.fit_transform(texts).toarray().astype("float32")
+            norms = np.linalg.norm(tfidf_matrix, axis=1, keepdims=True)
+            return tfidf_matrix / np.maximum(norms, 1e-12)
+        except Exception:
+            pass
 
-    embeddings = embeddings.astype(
-        "float32"
-    )
-
-    # Normalize for cosine similarity
-    faiss.normalize_L2(
-        embeddings
-    )
-
-    return embeddings
+    # Basic bag-of-words / word presence vector fallback
+    vocab = list(set(" ".join(texts).lower().split()))[:384]
+    word_to_idx = {w: i for i, w in enumerate(vocab)}
+    vecs = np.zeros((len(texts), max(len(vocab), 1)), dtype="float32")
+    for i, t in enumerate(texts):
+        for w in t.lower().split():
+            if w in word_to_idx:
+                vecs[i, word_to_idx[w]] += 1.0
+    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
+    return vecs / np.maximum(norms, 1e-12)
 
 
 # ============================================================
@@ -278,28 +312,17 @@ def create_embeddings(chunks):
 # ============================================================
 
 def build_faiss_index(embeddings):
+    if embeddings is None or len(embeddings) == 0:
+        raise ValueError("No embeddings were generated.")
 
-    if embeddings is None:
-        raise ValueError(
-            "Embeddings are empty."
-        )
+    if faiss is not None:
+        dimension = embeddings.shape[1]
+        index = faiss.IndexFlatIP(dimension)
+        index.add(embeddings)
+        return index
 
-    if len(embeddings) == 0:
-        raise ValueError(
-            "No embeddings were generated."
-        )
-
-    dimension = embeddings.shape[1]
-
-    index = faiss.IndexFlatIP(
-        dimension
-    )
-
-    index.add(
-        embeddings
-    )
-
-    return index
+    # Return raw embeddings matrix when faiss is not installed
+    return embeddings
 
 
 # ============================================================
@@ -312,62 +335,59 @@ def search_document(
     chunks,
     top_k=5
 ):
-
-    if index is None:
-        raise ValueError(
-            "FAISS index is not available."
-        )
-
-    if not chunks:
+    if index is None or not chunks:
         return []
 
+    number_of_results = min(top_k, len(chunks))
     model = get_embedding_model()
 
-    question_embedding = model.encode(
-        [question],
-        convert_to_numpy=True
-    )
+    if model is not None:
+        question_embedding = model.encode([question], convert_to_numpy=True).astype("float32")
+        if faiss is not None:
+            faiss.normalize_L2(question_embedding)
+        else:
+            norm = np.linalg.norm(question_embedding)
+            question_embedding = question_embedding / max(norm, 1e-12)
+    else:
+        # TF-IDF / term vector fallback
+        texts = [chunk["text"] for chunk in chunks]
+        vocab = list(set(" ".join(texts).lower().split()))[:384]
+        word_to_idx = {w: i for i, w in enumerate(vocab)}
+        question_embedding = np.zeros((1, max(len(vocab), 1)), dtype="float32")
+        for w in question.lower().split():
+            if w in word_to_idx:
+                question_embedding[0, word_to_idx[w]] += 1.0
+        norm = np.linalg.norm(question_embedding)
+        question_embedding = question_embedding / max(norm, 1e-12)
 
-    question_embedding = (
-        question_embedding.astype(
-            "float32"
-        )
-    )
+    # If standard FAISS index
+    if faiss is not None and hasattr(index, "search"):
+        scores, indices = index.search(question_embedding, number_of_results)
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0 or idx >= len(chunks):
+                continue
+            chunk = chunks[idx]
+            results.append({
+                "page_number": chunk["page_number"],
+                "chunk_index": chunk["chunk_index"],
+                "text": chunk["text"],
+                "score": float(score)
+            })
+        return results
 
-    # Normalize query vector
-    faiss.normalize_L2(
-        question_embedding
-    )
-
-    number_of_results = min(
-        top_k,
-        len(chunks)
-    )
-
-    scores, indices = index.search(
-        question_embedding,
-        number_of_results
-    )
-
+    # Direct cosine similarity matrix multiplication (FAISS-free)
+    scores = np.dot(index, question_embedding.T).flatten()
+    top_indices = np.argsort(scores)[::-1][:number_of_results]
     results = []
-
-    for score, index_position in zip(
-        scores[0],
-        indices[0]
-    ):
-
-        if index_position < 0:
-            continue
-
-        chunk = chunks[index_position]
-
+    for idx in top_indices:
+        chunk = chunks[idx]
         results.append({
             "page_number": chunk["page_number"],
             "chunk_index": chunk["chunk_index"],
             "text": chunk["text"],
-            "score": float(score)
+            "score": float(scores[idx])
         })
-
     return results
 
 
