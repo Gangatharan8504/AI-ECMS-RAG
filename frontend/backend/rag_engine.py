@@ -268,6 +268,10 @@ def create_chunks(
 # 3. CREATE EMBEDDINGS
 # ============================================================
 
+# ============================================================
+# 3. CREATE EMBEDDINGS
+# ============================================================
+
 def create_embeddings(chunks):
     if not chunks:
         raise ValueError("No document chunks available.")
@@ -275,54 +279,68 @@ def create_embeddings(chunks):
     model = get_embedding_model()
     texts = [chunk["text"] for chunk in chunks]
 
+    # 1. Use SentenceTransformer if available
     if model is not None:
-        embeddings = model.encode(texts, convert_to_numpy=True)
-        embeddings = embeddings.astype("float32")
-        if faiss is not None:
-            faiss.normalize_L2(embeddings)
-        else:
-            norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-            embeddings = embeddings / np.maximum(norms, 1e-12)
-        return embeddings
-
-    # Lightweight TF-IDF fallback if SentenceTransformer is not installed
-    if TfidfVectorizer is not None:
-        vectorizer = TfidfVectorizer(stop_words="english")
         try:
-            tfidf_matrix = vectorizer.fit_transform(texts).toarray().astype("float32")
-            norms = np.linalg.norm(tfidf_matrix, axis=1, keepdims=True)
-            return tfidf_matrix / np.maximum(norms, 1e-12)
-        except Exception:
-            pass
+            embeddings = model.encode(texts, convert_to_numpy=True).astype("float32")
+            if faiss is not None:
+                faiss.normalize_L2(embeddings)
+            else:
+                norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+                embeddings = embeddings / np.maximum(norms, 1e-12)
+            return {"type": "dense", "embeddings": embeddings}
+        except Exception as e:
+            print(f"SentenceTransformer encoding error, falling back to TF-IDF: {e}")
 
-    # Basic bag-of-words / word presence vector fallback
-    vocab = list(set(" ".join(texts).lower().split()))[:384]
+    # 2. High-performance TF-IDF vectorizer fallback (Serverless / Vercel friendly)
+    if TfidfVectorizer is not None:
+        try:
+            vectorizer = TfidfVectorizer(
+                ngram_range=(1, 2),
+                token_pattern=r"(?u)\b\w+\b",
+                stop_words="english",
+                max_features=4096
+            )
+            matrix = vectorizer.fit_transform(texts).toarray().astype("float32")
+            norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+            matrix = matrix / np.maximum(norms, 1e-12)
+            return {"type": "tfidf", "vectorizer": vectorizer, "matrix": matrix}
+        except Exception as e:
+            print(f"TF-IDF vectorizer fallback error: {e}")
+
+    # 3. Pure-python token frequency matrix fallback
+    vocab = sorted(list(set(" ".join(texts).lower().split())))[:2048]
     word_to_idx = {w: i for i, w in enumerate(vocab)}
-    vecs = np.zeros((len(texts), max(len(vocab), 1)), dtype="float32")
+    matrix = np.zeros((len(texts), max(len(vocab), 1)), dtype="float32")
     for i, t in enumerate(texts):
         for w in t.lower().split():
             if w in word_to_idx:
-                vecs[i, word_to_idx[w]] += 1.0
-    norms = np.linalg.norm(vecs, axis=1, keepdims=True)
-    return vecs / np.maximum(norms, 1e-12)
+                matrix[i, word_to_idx[w]] += 1.0
+    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    matrix = matrix / np.maximum(norms, 1e-12)
+    return {"type": "vocab", "word_to_idx": word_to_idx, "matrix": matrix}
 
 
 # ============================================================
 # 4. BUILD FAISS INDEX
 # ============================================================
 
-def build_faiss_index(embeddings):
-    if embeddings is None or len(embeddings) == 0:
-        raise ValueError("No embeddings were generated.")
+def build_faiss_index(embeddings_data):
+    if embeddings_data is None:
+        raise ValueError("No embeddings were provided.")
 
-    if faiss is not None:
-        dimension = embeddings.shape[1]
-        index = faiss.IndexFlatIP(dimension)
-        index.add(embeddings)
-        return index
+    # Handle dense embeddings with FAISS if installed
+    if isinstance(embeddings_data, dict) and embeddings_data.get("type") == "dense":
+        embeddings = embeddings_data["embeddings"]
+        if faiss is not None:
+            dimension = embeddings.shape[1]
+            index = faiss.IndexFlatIP(dimension)
+            index.add(embeddings)
+            return {"type": "faiss", "index": index}
+        return embeddings_data
 
-    # Return raw embeddings matrix when faiss is not installed
-    return embeddings
+    # Return structured dict index directly
+    return embeddings_data
 
 
 # ============================================================
@@ -331,53 +349,102 @@ def build_faiss_index(embeddings):
 
 def search_document(
     question,
-    index,
+    index_data,
     chunks,
     top_k=5
 ):
-    if index is None or not chunks:
+    if index_data is None or not chunks:
         return []
 
     number_of_results = min(top_k, len(chunks))
-    model = get_embedding_model()
 
-    if model is not None:
-        question_embedding = model.encode([question], convert_to_numpy=True).astype("float32")
-        if faiss is not None:
-            faiss.normalize_L2(question_embedding)
-        else:
-            norm = np.linalg.norm(question_embedding)
-            question_embedding = question_embedding / max(norm, 1e-12)
-    else:
-        # TF-IDF / term vector fallback
-        texts = [chunk["text"] for chunk in chunks]
-        vocab = list(set(" ".join(texts).lower().split()))[:384]
-        word_to_idx = {w: i for i, w in enumerate(vocab)}
-        question_embedding = np.zeros((1, max(len(vocab), 1)), dtype="float32")
-        for w in question.lower().split():
-            if w in word_to_idx:
-                question_embedding[0, word_to_idx[w]] += 1.0
-        norm = np.linalg.norm(question_embedding)
-        question_embedding = question_embedding / max(norm, 1e-12)
+    # Case A: FAISS Dense Index
+    if isinstance(index_data, dict) and index_data.get("type") == "faiss":
+        model = get_embedding_model()
+        if model is not None:
+            question_embedding = model.encode([question], convert_to_numpy=True).astype("float32")
+            if faiss is not None:
+                faiss.normalize_L2(question_embedding)
+            scores, indices = index_data["index"].search(question_embedding, number_of_results)
+            results = []
+            for score, idx in zip(scores[0], indices[0]):
+                if 0 <= idx < len(chunks):
+                    chunk = chunks[idx]
+                    results.append({
+                        "page_number": chunk["page_number"],
+                        "chunk_index": chunk["chunk_index"],
+                        "text": chunk["text"],
+                        "score": float(score)
+                    })
+            return results
 
-    # If standard FAISS index
-    if faiss is not None and hasattr(index, "search"):
-        scores, indices = index.search(question_embedding, number_of_results)
+    # Case B: TF-IDF Vectorizer Matrix
+    if isinstance(index_data, dict) and index_data.get("type") == "tfidf":
+        vectorizer = index_data["vectorizer"]
+        matrix = index_data["matrix"]
+        try:
+            q_vec = vectorizer.transform([question]).toarray().astype("float32")
+            q_norm = np.linalg.norm(q_vec)
+            if q_norm > 0:
+                q_vec = q_vec / q_norm
+            scores = (matrix @ q_vec.T).flatten()
+        except Exception:
+            scores = np.zeros(len(chunks), dtype="float32")
+
+        # Add keyword bonus for exact query tokens
+        q_tokens = [w.lower() for w in re.findall(r"\w+", question) if len(w) > 2]
+        for i, chunk in enumerate(chunks):
+            c_text = chunk["text"].lower()
+            for token in q_tokens:
+                if token in c_text:
+                    scores[i] += 0.25
+
+        top_indices = np.argsort(scores)[::-1][:number_of_results]
         results = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx < 0 or idx >= len(chunks):
-                continue
+        for idx in top_indices:
             chunk = chunks[idx]
             results.append({
                 "page_number": chunk["page_number"],
                 "chunk_index": chunk["chunk_index"],
                 "text": chunk["text"],
-                "score": float(score)
+                "score": round(float(scores[idx]), 4)
             })
         return results
 
-    # Direct cosine similarity matrix multiplication (FAISS-free)
-    scores = np.dot(index, question_embedding.T).flatten()
+    # Case C: Vocab / Term frequency fallback
+    if isinstance(index_data, dict) and index_data.get("type") == "vocab":
+        word_to_idx = index_data["word_to_idx"]
+        matrix = index_data["matrix"]
+        q_vec = np.zeros((1, matrix.shape[1]), dtype="float32")
+        for w in question.lower().split():
+            if w in word_to_idx:
+                q_vec[0, word_to_idx[w]] += 1.0
+        q_norm = np.linalg.norm(q_vec)
+        if q_norm > 0:
+            q_vec = q_vec / q_norm
+        scores = (matrix @ q_vec.T).flatten()
+
+        top_indices = np.argsort(scores)[::-1][:number_of_results]
+        results = []
+        for idx in top_indices:
+            chunk = chunks[idx]
+            results.append({
+                "page_number": chunk["page_number"],
+                "chunk_index": chunk["chunk_index"],
+                "text": chunk["text"],
+                "score": round(float(scores[idx]), 4)
+            })
+        return results
+
+    # Case D: Raw array / Legacy index fallback
+    scores = np.zeros(len(chunks), dtype="float32")
+    q_tokens = [w.lower() for w in re.findall(r"\w+", question) if len(w) > 2]
+    for i, chunk in enumerate(chunks):
+        c_text = chunk["text"].lower()
+        for token in q_tokens:
+            if token in c_text:
+                scores[i] += 1.0
+
     top_indices = np.argsort(scores)[::-1][:number_of_results]
     results = []
     for idx in top_indices:
@@ -386,7 +453,7 @@ def search_document(
             "page_number": chunk["page_number"],
             "chunk_index": chunk["chunk_index"],
             "text": chunk["text"],
-            "score": float(scores[idx])
+            "score": round(float(scores[idx]), 4)
         })
     return results
 
