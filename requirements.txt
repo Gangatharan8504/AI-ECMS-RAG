@@ -5,3 +5,9 @@ faiss-cpu
 numpy
 groq
 python-dotenv
+pymupdf
+pytesseract
+pillow
+fastapi
+uvicorn
+python-multipart
