@@ -298,13 +298,13 @@ function Sidebar() {
           <div className="profile">
 
             <div className="avatar">
-              C
+              A
             </div>
 
             <div className="profile-info">
 
               <strong>
-                Charan
+                Alex
               </strong>
 
               <span>

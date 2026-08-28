@@ -23,7 +23,7 @@ function Settings() {
   const [saved, setSaved] = useState(false);
 
   const [settings, setSettings] = useState({
-    fullName: "Charan",
+    fullName: "Alex",
     role: "Student",
     email: "",
     language: "English",
@@ -106,7 +106,7 @@ function Settings() {
         <div className="settings-profile">
 
           <div className="profile-avatar">
-            C
+            {(settings.fullName || "Alex").charAt(0).toUpperCase()}
           </div>
 
           <div className="profile-main">

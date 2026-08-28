@@ -32,7 +32,7 @@ function Dashboard() {
       <div className="dashboard-header">
         <div>
           <p className="welcome-small">COLLEGE CONTENT INTELLIGENCE</p>
-          <h1>Good morning, Charan 👋</h1>
+          <h1>Good morning, Alex 👋</h1>
           <p className="header-description">
             Manage, analyze and understand your college content with AI.
           </p>
