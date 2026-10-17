@@ -234,51 +234,6 @@ const Assistant = () => {
       </header>
 
       {/* =========================
-          AI STATUS BAR
-      ========================== */}
-      <div className="ai-status-bar">
-        <div className="status-item">
-          <div className="status-icon">
-            <BrainCircuit size={17} />
-          </div>
-          <div>
-            <span>RAG Engine</span>
-            <strong>{isBackendOnline ? "Ready" : "Offline"}</strong>
-          </div>
-        </div>
-
-        <div className="status-item">
-          <div className="status-icon">
-            <Search size={17} />
-          </div>
-          <div>
-            <span>FAISS Search</span>
-            <strong>Ready</strong>
-          </div>
-        </div>
-
-        <div className="status-item">
-          <div className="status-icon">
-            <Sparkles size={17} />
-          </div>
-          <div>
-            <span>Groq LLM</span>
-            <strong>Ready</strong>
-          </div>
-        </div>
-
-        <div className="status-item">
-          <div className="status-icon">
-            <ShieldCheck size={17} />
-          </div>
-          <div>
-            <span>Grounded Answers</span>
-            <strong>Enabled</strong>
-          </div>
-        </div>
-      </div>
-
-      {/* =========================
           MAIN WORKSPACE
       ========================== */}
       <div className="assistant-workspace">
