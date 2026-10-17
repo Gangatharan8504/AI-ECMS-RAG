@@ -248,13 +248,23 @@
    MAIN GRID
 ========================================================= */
 
-.dashboard-main-grid,
-.dashboard-bottom-grid {
+.dashboard-main-grid {
   width: 100%;
   min-width: 0;
 
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.9fr);
+
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.dashboard-bottom-grid {
+  width: 100%;
+  min-width: 0;
+
+  display: grid;
+  grid-template-columns: 1fr;
 
   gap: 16px;
   margin-bottom: 20px;

@@ -206,41 +206,6 @@ function Dashboard() {
             ))
           )}
         </section>
-
-        {/* SYSTEM STATUS */}
-        <section className="dashboard-panel system-panel">
-          <div className="dashboard-panel-header">
-            <div>
-              <h2>AI System Status</h2>
-              <p>Intelligence services</p>
-            </div>
-          </div>
-
-          <SystemStatus
-            name="Groq LLM"
-            status={isBackendOnline ? "Ready" : "Connecting"}
-            online={isBackendOnline}
-          />
-
-          <SystemStatus
-            name="FAISS Search"
-            status={isBackendOnline ? "Ready" : "Connecting"}
-            online={isBackendOnline}
-          />
-
-          <SystemStatus
-            name="Embeddings"
-            status={isBackendOnline ? "Ready" : "Connecting"}
-            online={isBackendOnline}
-          />
-
-          <SystemStatus
-            name="FastAPI Backend"
-            status={isBackendOnline ? "Online" : "Offline"}
-            online={isBackendOnline}
-            warning={!isBackendOnline}
-          />
-        </section>
       </div>
     </div>
   );
@@ -357,22 +322,6 @@ function ActivityRow({ activity }) {
       </div>
 
       <small>{activity.time}</small>
-    </div>
-  );
-}
-
-/* =========================================================
-   SYSTEM STATUS
-========================================================= */
-function SystemStatus({ name, status, online = true, warning = false }) {
-  return (
-    <div className="system-status-row">
-      <span>{name}</span>
-
-      <strong className={warning ? "system-warning" : online ? "system-online" : "system-warning"}>
-        <i></i>
-        {status}
-      </strong>
     </div>
   );
 }
