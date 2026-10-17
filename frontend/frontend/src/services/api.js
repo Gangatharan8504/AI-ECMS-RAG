@@ -55,4 +55,22 @@ export const translateText = async (text, targetLanguage) => {
   return response.data;
 };
 
+export const loginUser = async (email, password) => {
+  const response = await api.post("/api/auth/login", {
+    email,
+    password,
+  });
+  return response.data;
+};
+
+export const registerUser = async (name, email, password, role = "Student") => {
+  const response = await api.post("/api/auth/register", {
+    name,
+    email,
+    password,
+    role,
+  });
+  return response.data;
+};
+
 export default api;

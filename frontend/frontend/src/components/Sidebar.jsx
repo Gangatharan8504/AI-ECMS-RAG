@@ -12,14 +12,17 @@ import {
   X,
 } from "lucide-react";
 
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 import "./Sidebar.css";
 
 function Sidebar() {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
 
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -298,17 +301,17 @@ function Sidebar() {
           <div className="profile">
 
             <div className="avatar">
-              A
+              {(user?.name || "Alex").charAt(0).toUpperCase()}
             </div>
 
             <div className="profile-info">
 
               <strong>
-                Alex
+                {user?.name || "Alex"}
               </strong>
 
               <span>
-                Student
+                {user?.role || "Student"}
               </span>
 
             </div>
@@ -316,6 +319,10 @@ function Sidebar() {
             <button
               className="logout-button"
               title="Logout"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
             >
               <LogOut size={17} />
             </button>

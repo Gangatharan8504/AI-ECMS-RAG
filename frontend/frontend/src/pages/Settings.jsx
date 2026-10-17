@@ -12,26 +12,39 @@ import {
   Lock,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "../context/ThemeContext";
+import { useAuth } from "../context/AuthContext";
 
 import "./Settings.css";
 
 function Settings() {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
 
   const [saved, setSaved] = useState(false);
 
   const [settings, setSettings] = useState({
-    fullName: "Alex",
-    role: "Student",
-    email: "",
+    fullName: user?.name || "Alex",
+    role: user?.role || "Student",
+    email: user?.email || "alex@college.edu",
     language: "English",
     notifications: true,
     emailNotifications: true,
     voiceLanguage: "English",
     autoSpeak: false,
   });
+
+  useEffect(() => {
+    if (user) {
+      setSettings((prev) => ({
+        ...prev,
+        fullName: user.name || prev.fullName,
+        role: user.role || prev.role,
+        email: user.email || prev.email,
+      }));
+    }
+  }, [user]);
 
   const updateSetting = (key, value) => {
     setSettings((previous) => ({

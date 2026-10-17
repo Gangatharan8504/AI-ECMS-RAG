@@ -27,6 +27,7 @@ from rag_engine import (
     translate_text,
     detect_language,
 )
+from auth import register_user, login_user
 
 
 # ============================================================
@@ -40,6 +41,18 @@ class AskRequest(BaseModel):
 class TranslateRequest(BaseModel):
     text: str
     target_language: str
+
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: Optional[str] = "Student"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 # ============================================================
@@ -117,6 +130,50 @@ def health_check():
         "service": "AI ECMS",
         "rag_engine": "available",
         "documents_count": len(documents),
+    }
+
+
+# ============================================================
+# AUTHENTICATION ENDPOINTS
+# ============================================================
+
+@app.post("/api/auth/register")
+def register(payload: RegisterRequest):
+    success, message, user = register_user(
+        payload.name,
+        payload.email,
+        payload.password,
+        payload.role or "Student"
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {
+        "success": True,
+        "message": message,
+        "user": user
+    }
+
+
+@app.post("/api/auth/login")
+def login(payload: LoginRequest):
+    success, message, user = login_user(
+        payload.email,
+        payload.password
+    )
+    if not success:
+        raise HTTPException(status_code=401, detail=message)
+    return {
+        "success": True,
+        "message": message,
+        "user": user
+    }
+
+
+@app.get("/api/auth/me")
+def get_auth_status():
+    return {
+        "status": "online",
+        "service": "AI ECMS Authentication"
     }
 
 
@@ -462,3 +519,4 @@ if frontend_dist:
         if os.path.exists(index_path):
             return FileResponse(index_path)
         raise HTTPException(status_code=404, detail="Page not found")
+

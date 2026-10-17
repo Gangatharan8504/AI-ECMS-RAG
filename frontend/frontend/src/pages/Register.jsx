@@ -12,11 +12,14 @@ import {
   ShieldCheck,
   BrainCircuit,
   FileText,
+  Loader2,
 } from "lucide-react";
 import "./Auth.css";
+import { useAuth } from "../context/AuthContext";
 
 const Register = () => {
   const navigate = useNavigate();
+  const { register, loading } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -42,7 +45,7 @@ const Register = () => {
     setError("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -70,16 +73,18 @@ const Register = () => {
       return;
     }
 
-    /*
-      Authentication backend is not connected yet.
-
-      We intentionally do NOT create fake authentication here.
-      This form will be connected to FastAPI in the next stage.
-    */
-
-    setError(
-      "Registration UI is ready. Backend authentication will be connected next."
+    const result = await register(
+      formData.name,
+      formData.email,
+      formData.password,
+      formData.role
     );
+
+    if (result.success) {
+      navigate("/");
+    } else {
+      setError(result.message);
+    }
   };
 
   return (
@@ -325,9 +330,22 @@ const Register = () => {
                 </div>
               )}
 
-              <button type="submit" className="auth-submit">
-                <span>Create Account</span>
-                <ArrowRight size={18} />
+              <button
+                type="submit"
+                className="auth-submit"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Creating Account...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Create Account</span>
+                    <ArrowRight size={18} />
+                  </>
+                )}
               </button>
 
               <div className="auth-security">

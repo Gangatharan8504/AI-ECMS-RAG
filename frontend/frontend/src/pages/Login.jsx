@@ -11,12 +11,15 @@ import {
   ShieldCheck,
   BrainCircuit,
   FileText,
+  Loader2,
 } from "lucide-react";
 
 import "./Auth.css";
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, loading } = useAuth();
 
   const [showPassword, setShowPassword] = useState(false);
 
@@ -38,7 +41,15 @@ const Login = () => {
     setError("");
   };
 
-  const handleSubmit = (e) => {
+  const fillDemoAccount = () => {
+    setFormData({
+      email: "alex@college.edu",
+      password: "password123",
+    });
+    setError("");
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.email.trim()) {
@@ -61,27 +72,12 @@ const Login = () => {
       return;
     }
 
-    /*
-      Backend authentication will be connected here.
-
-      Future flow:
-
-      React
-        ↓
-      FastAPI /login
-        ↓
-      Verify hashed password
-        ↓
-      Generate JWT
-        ↓
-      Store authentication state
-        ↓
-      Navigate to dashboard
-    */
-
-    setError(
-      "Login UI is ready. FastAPI authentication will be connected next."
-    );
+    const result = await login(formData.email, formData.password);
+    if (result.success) {
+      navigate("/");
+    } else {
+      setError(result.message);
+    }
   };
 
   return (
@@ -328,9 +324,44 @@ const Login = () => {
               <button
                 type="submit"
                 className="auth-submit"
+                disabled={loading}
               >
-                <span>Sign In</span>
-                <LogIn size={18} />
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Signing In...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <LogIn size={18} />
+                  </>
+                )}
+              </button>
+
+              {/* DEMO ACCOUNT SHORTCUT */}
+              <button
+                type="button"
+                onClick={fillDemoAccount}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px dashed rgba(225, 29, 72, 0.4)",
+                  background: "rgba(225, 29, 72, 0.04)",
+                  color: "#e11d48",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  marginTop: "8px",
+                }}
+              >
+                <Sparkles size={14} />
+                <span>Fill Demo Account (Alex)</span>
               </button>
 
               {/* SECURITY */}

@@ -11,9 +11,11 @@ import {
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
 import { useDocuments } from "../context/DocumentContext";
+import { useAuth } from "../context/AuthContext";
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     documents,
     totalPages,
@@ -32,7 +34,7 @@ function Dashboard() {
       <div className="dashboard-header">
         <div>
           <p className="welcome-small">COLLEGE CONTENT INTELLIGENCE</p>
-          <h1>Good morning, Alex 👋</h1>
+          <h1>Good morning, {user?.name || "Alex"} 👋</h1>
           <p className="header-description">
             Manage, analyze and understand your college content with AI.
           </p>
