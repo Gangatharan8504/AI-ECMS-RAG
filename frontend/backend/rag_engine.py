@@ -476,23 +476,38 @@ def get_groq_client():
     )
 
 
+_cached_groq_model = None
+
 def get_groq_model():
-    # BUG FIX: "openai/gpt-oss-120b" is NOT a valid Groq model ID.
-    # Use llama-3.1-8b-instant as the default (fast, free-tier supported).
-    model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-    # Validate: if an unrecognised model is set, fall back safely
-    valid_models = {
-        "llama-3.1-8b-instant",
+    global _cached_groq_model
+    if _cached_groq_model is not None:
+        return _cached_groq_model
+
+    env_model = os.getenv("GROQ_MODEL")
+    candidates = []
+    if env_model:
+        candidates.append(env_model.strip())
+    candidates.extend([
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
         "llama-3.3-70b-versatile",
-        "llama3-8b-8192",
-        "llama3-70b-8192",
-        "gemma2-9b-it",
-        "mixtral-8x7b-32768",
-    }
-    if model not in valid_models:
-        print(f"[WARN] Unknown GROQ_MODEL '{model}', falling back to llama-3.1-8b-instant")
-        return "llama-3.1-8b-instant"
-    return model
+        "llama-3.1-8b-instant",
+        "qwen/qwen3.8-27b",
+    ])
+
+    try:
+        client = get_groq_client()
+        available_models = {m.id for m in client.models.list().data}
+        for cand in candidates:
+            if cand in available_models:
+                _cached_groq_model = cand
+                print(f"[INFO] Selected active Groq model: {_cached_groq_model}")
+                return _cached_groq_model
+    except Exception as e:
+        print(f"[WARN] Failed to query Groq model list: {e}")
+
+    _cached_groq_model = candidates[0] if candidates else "openai/gpt-oss-120b"
+    return _cached_groq_model
 
 
 # ============================================================
