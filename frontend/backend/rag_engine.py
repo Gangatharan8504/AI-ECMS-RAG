@@ -478,36 +478,71 @@ def get_groq_client():
 
 _cached_groq_model = None
 
+# Known dead or decommissioned models on current Groq key
+UNSUPPORTED_MODELS = {
+    "llama-3.1-8b-instant",
+    "llama3-8b-8192",
+    "llama3-70b-8192",
+    "llama-3.3-70b-versatile",
+}
+
 def get_groq_model():
     global _cached_groq_model
     if _cached_groq_model is not None:
         return _cached_groq_model
 
     env_model = os.getenv("GROQ_MODEL")
-    candidates = []
     if env_model:
-        candidates.append(env_model.strip())
-    candidates.extend([
+        env_model = env_model.strip()
+        if env_model in UNSUPPORTED_MODELS:
+            print(f"[WARN] GROQ_MODEL '{env_model}' is decommissioned. Remapping to 'openai/gpt-oss-120b'.")
+            env_model = "openai/gpt-oss-120b"
+
+    _cached_groq_model = env_model or "openai/gpt-oss-120b"
+    return _cached_groq_model
+
+
+def create_chat_completion(messages, temperature=0.1):
+    """
+    Execute chat completion with automatic fallback across verified models
+    so 404 'model_not_found' never breaks user queries.
+    """
+    client = get_groq_client()
+    preferred = get_groq_model()
+
+    models_to_try = []
+    if preferred and preferred not in UNSUPPORTED_MODELS:
+        models_to_try.append(preferred)
+    models_to_try.extend([
         "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
         "qwen/qwen3.8-27b",
+        "allam-2-7b",
     ])
 
-    try:
-        client = get_groq_client()
-        available_models = {m.id for m in client.models.list().data}
-        for cand in candidates:
-            if cand in available_models:
-                _cached_groq_model = cand
-                print(f"[INFO] Selected active Groq model: {_cached_groq_model}")
-                return _cached_groq_model
-    except Exception as e:
-        print(f"[WARN] Failed to query Groq model list: {e}")
+    seen = set()
+    unique_models = [m for m in models_to_try if not (m in seen or seen.add(m))]
 
-    _cached_groq_model = candidates[0] if candidates else "openai/gpt-oss-120b"
-    return _cached_groq_model
+    last_error = None
+    for model_name in unique_models:
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=temperature
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "model_not_found" in err_msg or "does not exist" in err_msg or "404" in err_msg:
+                print(f"[WARN] Model '{model_name}' not available on Groq, retrying with next candidate: {e}")
+                last_error = e
+                continue
+            raise e
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("No operational Groq models available.")
 
 
 # ============================================================
@@ -624,11 +659,10 @@ only the document information above.
 """
 
     # --------------------------------------------------------
-    # GROQ REQUEST
+    # GROQ REQUEST WITH AUTOMATIC RETRY
     # --------------------------------------------------------
 
-    response = client.chat.completions.create(
-        model=model_name,
+    return create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -641,8 +675,6 @@ only the document information above.
         ],
         temperature=0.2
     )
-
-    return response.choices[0].message.content
 
 
 # ============================================================
@@ -712,8 +744,7 @@ COMPLETE DOCUMENT:
 Generate exactly 5 important points.
 """
 
-    response = client.chat.completions.create(
-        model=model_name,
+    return create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -726,8 +757,6 @@ Generate exactly 5 important points.
         ],
         temperature=0.1
     )
-
-    return response.choices[0].message.content
 
 
 # ============================================================
@@ -758,8 +787,7 @@ Do not invent topics.
 Return exactly 5 numbered topics.
 """
 
-    response = client.chat.completions.create(
-        model=model_name,
+    return create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -772,8 +800,6 @@ Return exactly 5 numbered topics.
         ],
         temperature=0.1
     )
-
-    return response.choices[0].message.content
 
 
 # ============================================================
@@ -820,8 +846,7 @@ return exactly:
 Keep the response short.
 """
 
-    response = client.chat.completions.create(
-        model=model_name,
+    return create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -834,8 +859,6 @@ Keep the response short.
         ],
         temperature=0.1
     )
-
-    return response.choices[0].message.content
 
 
 # ============================================================
@@ -877,8 +900,7 @@ Rules:
 10. Return only the translated content.
 """
 
-    response = client.chat.completions.create(
-        model=model_name,
+    return create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -891,8 +913,6 @@ Rules:
         ],
         temperature=0.1
     )
-
-    return response.choices[0].message.content
 
 
 # ============================================================
@@ -942,8 +962,7 @@ TEXT:
 {text[:12000]}
 """
 
-    response = client.chat.completions.create(
-        model=get_groq_model(),
+    response_text = create_chat_completion(
         messages=[
             {
                 "role": "system",
@@ -957,12 +976,4 @@ TEXT:
         temperature=0
     )
 
-    language = (
-        response
-        .choices[0]
-        .message
-        .content
-        .strip()
-    )
-
-    return language
+    return response_text.strip()
