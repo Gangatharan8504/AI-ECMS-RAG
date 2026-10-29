@@ -4,6 +4,8 @@ import { loginUser, registerUser } from "../services/api";
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
+  // BUG FIX: Do NOT default to a fake "Alex" user.
+  // Start as null — force real login every session.
   const [user, setUser] = useState(() => {
     try {
       const stored = localStorage.getItem("ai_ecms_user");
@@ -12,18 +14,14 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (e) {
       console.error("Failed to parse stored user:", e);
+      localStorage.removeItem("ai_ecms_user");
     }
-    // Default initial user profile (Alex)
-    return {
-      id: 1,
-      name: "Alex",
-      email: "alex@college.edu",
-      role: "Student",
-    };
+    return null; // No auto-login with fake data
   });
 
   const [loading, setLoading] = useState(false);
 
+  // Persist user to localStorage whenever it changes
   useEffect(() => {
     if (user) {
       localStorage.setItem("ai_ecms_user", JSON.stringify(user));

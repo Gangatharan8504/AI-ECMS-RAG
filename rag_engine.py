@@ -268,10 +268,6 @@ def create_chunks(
 # 3. CREATE EMBEDDINGS
 # ============================================================
 
-# ============================================================
-# 3. CREATE EMBEDDINGS
-# ============================================================
-
 def create_embeddings(chunks):
     if not chunks:
         raise ValueError("No document chunks available.")
@@ -481,9 +477,21 @@ def get_groq_client():
 
 
 def get_groq_model():
-    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-    if model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-8b-8192", "llama3-70b-8192", "gemma2-9b-it"]:
-        return "openai/gpt-oss-120b"
+    # BUG FIX: "openai/gpt-oss-120b" is NOT a valid Groq model ID.
+    # Use llama-3.1-8b-instant as the default (fast, free-tier supported).
+    model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    # Validate: if an unrecognised model is set, fall back safely
+    valid_models = {
+        "llama-3.1-8b-instant",
+        "llama-3.3-70b-versatile",
+        "llama3-8b-8192",
+        "llama3-70b-8192",
+        "gemma2-9b-it",
+        "mixtral-8x7b-32768",
+    }
+    if model not in valid_models:
+        print(f"[WARN] Unknown GROQ_MODEL '{model}', falling back to llama-3.1-8b-instant")
+        return "llama-3.1-8b-instant"
     return model
 
 

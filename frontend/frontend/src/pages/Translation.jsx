@@ -147,9 +147,22 @@ const Translation = () => {
     const text = getDocumentPreviewText();
     if (!text || !window.speechSynthesis) return;
 
+    // BUG FIX: use the actual source/detected language, not hardcoded "en-US"
+    const voiceMap = {
+      English: "en-US",
+      Tamil: "ta-IN",
+      Hindi: "hi-IN",
+      Telugu: "te-IN",
+      Malayalam: "ml-IN",
+      Kannada: "kn-IN",
+      French: "fr-FR",
+      German: "de-DE",
+      Spanish: "es-ES",
+    };
+
     window.speechSynthesis.cancel();
     const speech = new SpeechSynthesisUtterance(text);
-    speech.lang = "en-US";
+    speech.lang = voiceMap[sourceLanguage] || "en-US";
     window.speechSynthesis.speak(speech);
   };
 
