@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ShieldCheck,
@@ -21,40 +21,78 @@ import {
   CircleDot,
   RefreshCw,
   X,
+  Check,
+  Send,
+  Download,
 } from "lucide-react";
 
 import "./ContentReview.css";
 import { useDocuments } from "../context/DocumentContext";
+import { useAuth } from "../context/AuthContext";
 
 const ContentReview = () => {
   const navigate = useNavigate();
-  const { documents, isBackendOnline, setActiveDocument } = useDocuments();
+  const { documents, isBackendOnline, setActiveDocument, refreshDocuments } = useDocuments();
+  const { user } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState("All");
   const [showFilter, setShowFilter] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedReviewDoc, setSelectedReviewDoc] = useState(null);
 
+  // Review decisions state persisted in localStorage
+  const [reviewDecisions, setReviewDecisions] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ai_ecms_review_decisions");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Reviewer comment input
+  const [reviewerComment, setReviewerComment] = useState("");
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
+
+  const saveDecision = (docId, status, comment = "") => {
+    const updated = {
+      ...reviewDecisions,
+      [docId]: {
+        status,
+        reviewer: user?.name || "Faculty Reviewer",
+        comment,
+        timestamp: new Date().toLocaleString(),
+      },
+    };
+    setReviewDecisions(updated);
+    localStorage.setItem("ai_ecms_review_decisions", JSON.stringify(updated));
+    setReviewSuccessMsg(`Document marked as "${status}" by ${user?.name || "Reviewer"}`);
+    setTimeout(() => setReviewSuccessMsg(""), 3500);
+  };
+
   const filters = [
     "All",
     "Pending Review",
-    "AI Reviewed",
     "Approved",
     "Changes Requested",
+    "Rejected",
   ];
 
-  // Derive review status from actual backend risk analysis
+  // Derive review status for each document
   const reviewDocuments = documents.map((doc) => {
-    let reviewStatus = "AI Reviewed";
-    if (doc.risks && !doc.risks.toLowerCase().includes("no significant content-quality risks")) {
+    const saved = reviewDecisions[doc.id];
+    let reviewStatus = "Pending Review";
+
+    if (saved && saved.status) {
+      reviewStatus = saved.status;
+    } else if (doc.risks && !doc.risks.toLowerCase().includes("no significant content-quality risks")) {
       reviewStatus = "Changes Requested";
-    } else {
-      reviewStatus = "Approved";
     }
 
     return {
       ...doc,
       reviewStatus,
+      reviewerInfo: saved || null,
     };
   });
 
@@ -67,27 +105,37 @@ const ContentReview = () => {
     return matchesFilter && matchesSearch;
   });
 
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "Approved":
+        return <CheckCircle2 size={13} />;
+      case "Changes Requested":
+        return <AlertTriangle size={13} />;
+      case "Rejected":
+        return <XCircle size={13} />;
+      default:
+        return <Clock3 size={13} />;
+    }
+  };
+
   const workflowSteps = [
     {
       number: "01",
       icon: BrainCircuit,
       title: "AI Analysis",
-      description:
-        "AI analyzes document content, rules, risks and important information.",
+      description: "AI extracts text, detects risks, topics and institutional compliance.",
     },
     {
       number: "02",
       icon: ClipboardCheck,
       title: "Content Review",
-      description:
-        "Faculty or authorized staff review the AI findings and document content.",
+      description: "Authorized staff or faculty audit findings and add governance notes.",
     },
     {
       number: "03",
       icon: UserCheck,
       title: "Human Approval",
-      description:
-        "Approved content can move forward after human verification.",
+      description: "Approved college resources are verified and certified for institutional use.",
     },
   ];
 
@@ -95,43 +143,24 @@ const ContentReview = () => {
     {
       icon: ShieldCheck,
       title: "Policy Compliance",
-      description:
-        "Check academic and institutional content for important policy concerns.",
+      description: "Check academic and institutional content for important policy concerns.",
     },
     {
       icon: AlertTriangle,
       title: "Risk Detection",
-      description:
-        "Identify potentially important clauses, missing information or risks.",
+      description: "Identify potentially important clauses, missing information or risks.",
     },
     {
       icon: FileText,
       title: "Content Quality",
-      description:
-        "Review document structure, clarity and extracted content.",
+      description: "Review document structure, clarity and extracted content.",
     },
     {
       icon: MessageSquare,
       title: "Reviewer Feedback",
-      description:
-        "Allow authorized reviewers to add comments and request changes.",
+      description: "Allow authorized reviewers to add comments and request changes.",
     },
   ];
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "Approved":
-        return <CheckCircle2 size={15} />;
-      case "Pending Review":
-        return <Clock3 size={15} />;
-      case "AI Reviewed":
-        return <ShieldCheck size={15} />;
-      case "Changes Requested":
-        return <XCircle size={15} />;
-      default:
-        return <CircleDot size={15} />;
-    }
-  };
 
   return (
     <div className="review-page">
@@ -141,7 +170,7 @@ const ContentReview = () => {
       <header className="review-header">
         <div className="review-heading">
           <div className="review-title-icon">
-            <ShieldCheck size={22} />
+            <ClipboardCheck size={22} />
           </div>
 
           <div>
@@ -159,14 +188,33 @@ const ContentReview = () => {
           </div>
         </div>
 
-        <div className="review-header-status">
-          <span
-            className="review-status-dot"
-            style={{ background: isBackendOnline ? "#22c55e" : "#e11d48" }}
-          ></span>
-          Review Workflow Ready
+        <div className="review-status">
+          <span className="review-status-dot"></span>
+          <span>Review Workflow Ready</span>
         </div>
       </header>
+
+      {/* SUCCESS NOTIFICATION */}
+      {reviewSuccessMsg && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            background: "#dcfce7",
+            border: "1px solid #86efac",
+            color: "#166534",
+            padding: "12px 18px",
+            borderRadius: "10px",
+            marginBottom: "18px",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          <CheckCircle2 size={18} />
+          <span>{reviewSuccessMsg}</span>
+        </div>
+      )}
 
       {/* =====================================
           HERO
@@ -198,9 +246,14 @@ const ContentReview = () => {
               <ArrowRight size={14} />
             </button>
 
-            <button className="secondary-review-button">
-              <ClipboardCheck size={15} />
-              Review Workflow
+            <button
+              className="secondary-review-button"
+              onClick={() => {
+                refreshDocuments();
+              }}
+            >
+              <RefreshCw size={15} />
+              Refresh Queue
             </button>
           </div>
         </div>
@@ -321,15 +374,16 @@ const ContentReview = () => {
           </div>
         </div>
 
-        {/* REVIEW DETAILS MODAL / CARD */}
+        {/* INTERACTIVE REVIEW INSPECTION MODAL / DRAWER */}
         {selectedReviewDoc && (
           <div
             style={{
-              padding: "16px",
-              marginBottom: "16px",
-              borderRadius: "12px",
-              background: "#fff1f2",
-              border: "1px solid #fecdd3",
+              padding: "20px",
+              marginBottom: "20px",
+              borderRadius: "14px",
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
             }}
           >
             <div
@@ -337,35 +391,173 @@ const ContentReview = () => {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "8px",
+                paddingBottom: "12px",
+                borderBottom: "1px solid #f1f5f9",
+                marginBottom: "16px",
               }}
             >
-              <strong style={{ color: "#be123c", fontSize: "14px" }}>
-                AI Risk & Quality Assessment: {selectedReviewDoc.name}
-              </strong>
+              <div>
+                <strong style={{ color: "#0f172a", fontSize: "16px" }}>
+                  Auditing Document: {selectedReviewDoc.name}
+                </strong>
+                <span style={{ display: "block", fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                  {selectedReviewDoc.pages} Pages • Language: {selectedReviewDoc.language || "English"}
+                </span>
+              </div>
               <button
                 onClick={() => setSelectedReviewDoc(null)}
                 style={{
-                  background: "transparent",
+                  background: "#f1f5f9",
                   border: "none",
+                  borderRadius: "50%",
+                  width: "28px",
+                  height: "28px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   cursor: "pointer",
-                  color: "#be123c",
+                  color: "#64748b",
                 }}
               >
                 <X size={16} />
               </button>
             </div>
-            <p
+
+            {/* AI FINDINGS GRID */}
+            <div
               style={{
-                margin: 0,
-                fontSize: "12px",
-                lineHeight: "1.6",
-                color: "#4c0519",
-                whiteSpace: "pre-wrap",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+                marginBottom: "16px",
               }}
             >
-              {selectedReviewDoc.risks || "No significant content-quality risks detected."}
-            </p>
+              <div
+                style={{
+                  background: "#f8fafc",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#4f46e5", textTransform: "uppercase" }}>
+                  Executive AI Summary
+                </span>
+                <p style={{ fontSize: "12px", color: "#334155", margin: "6px 0 0", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                  {selectedReviewDoc.summary || "Summary generation pending."}
+                </p>
+              </div>
+
+              <div
+                style={{
+                  background: "#fff1f2",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  border: "1px solid #fecdd3",
+                }}
+              >
+                <span style={{ fontSize: "11px", fontWeight: "700", color: "#be123c", textTransform: "uppercase" }}>
+                  Risk & Policy Compliance Checks
+                </span>
+                <p style={{ fontSize: "12px", color: "#881337", margin: "6px 0 0", lineHeight: "1.6", whiteSpace: "pre-wrap" }}>
+                  {selectedReviewDoc.risks || "No significant content-quality risks detected."}
+                </p>
+              </div>
+            </div>
+
+            {/* REVIEWER DECISION ACTIONS */}
+            <div
+              style={{
+                background: "#f8fafc",
+                padding: "16px",
+                borderRadius: "10px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#334155", marginBottom: "6px" }}>
+                Reviewer Governance Comment / Modification Request:
+              </label>
+              <input
+                type="text"
+                value={reviewerComment}
+                onChange={(e) => setReviewerComment(e.target.value)}
+                placeholder="e.g. Verified for university syllabus standards; approved."
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  marginBottom: "12px",
+                  outline: "none",
+                }}
+              />
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>
+                  Active Reviewer: <strong>{user?.name || "Alex (Faculty)"}</strong>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => saveDecision(selectedReviewDoc.id, "Rejected", reviewerComment)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: "#ef4444",
+                      color: "#fff",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <X size={14} /> Reject
+                  </button>
+
+                  <button
+                    onClick={() => saveDecision(selectedReviewDoc.id, "Changes Requested", reviewerComment)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 14px",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: "#f59e0b",
+                      color: "#fff",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <AlertTriangle size={14} /> Request Changes
+                  </button>
+
+                  <button
+                    onClick={() => saveDecision(selectedReviewDoc.id, "Approved", reviewerComment)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      border: "none",
+                      background: "#10b981",
+                      color: "#fff",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Check size={14} /> Approve Document
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -378,7 +570,7 @@ const ContentReview = () => {
 
             <h4>No documents in the review queue</h4>
             <p>
-              Documents submitted for AI analysis will appear here when they require human review.
+              Upload documents in the Documents section to start the review & approval workflow.
             </p>
 
             <button
@@ -401,7 +593,8 @@ const ContentReview = () => {
                 <div className="document-row-info">
                   <strong>{document.name}</strong>
                   <span>
-                    {document.category || "Academic"} • {document.pages} pages • {document.language}
+                    {document.category || "Academic"} • {document.pages} pages • {document.language || "English"}
+                    {document.reviewerInfo && ` • Reviewed by ${document.reviewerInfo.reviewer}`}
                   </span>
                 </div>
 
@@ -419,10 +612,11 @@ const ContentReview = () => {
                   onClick={() => {
                     setActiveDocument(document);
                     setSelectedReviewDoc(document);
+                    setReviewerComment(document.reviewerInfo?.comment || "");
                   }}
                 >
                   <Eye size={14} />
-                  Review
+                  Review & Decide
                 </button>
               </div>
             ))}
@@ -476,11 +670,6 @@ const ContentReview = () => {
           <p>
             Tracks document content quality, AI risk identification and human reviewer approval history.
           </p>
-        </div>
-
-        <div className="review-info-status">
-          <CircleDot size={12} />
-          {isBackendOnline ? "Connected to Backend" : "Connecting..."}
         </div>
       </section>
     </div>
