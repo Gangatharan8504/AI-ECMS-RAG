@@ -4,7 +4,6 @@ import {
   MessageSquare,
   Languages,
   ClipboardCheck,
-  Sparkles,
   Settings as SettingsIcon,
   LogOut,
   Sun,
@@ -235,25 +234,7 @@ function Sidebar() {
             </span>
           </NavLink>
 
-          <p className="nav-title">
-            AGENT AUTOMATION
-          </p>
 
-          <NavLink
-            to="/agents"
-            onClick={closeMobileMenu}
-            className={({ isActive }) =>
-              `nav-item ${
-                isActive ? "active" : ""
-              }`
-            }
-          >
-            <Sparkles size={18} />
-
-            <span>
-              Agent Studio
-            </span>
-          </NavLink>
 
         </div>
 
