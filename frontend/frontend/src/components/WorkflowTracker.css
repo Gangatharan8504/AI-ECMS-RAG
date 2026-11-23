@@ -1,0 +1,142 @@
+.workflow-tracker-box {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.workflow-tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.workflow-tracker-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.workflow-tracker-header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.workflow-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workflow-status-pill.pending_approval,
+.workflow-status-pill.draft {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.workflow-status-pill.approved,
+.workflow-status-pill.published {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.workflow-status-pill.rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.workflow-steps-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+}
+
+.tracker-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  min-width: 90px;
+}
+
+.tracker-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  transition: all 0.25s ease;
+}
+
+.tracker-step.completed .tracker-circle {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+}
+
+.tracker-step.current .tracker-circle {
+  background: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.2);
+  animation: pulseScale 2s infinite ease-in-out;
+}
+
+@keyframes pulseScale {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+.tracker-step.pending .tracker-circle {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border: 1px solid #cbd5e1;
+}
+
+.tracker-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.tracker-step.completed .tracker-label {
+  color: #047857;
+}
+
+.tracker-step.current .tracker-label {
+  color: #4338ca;
+  font-weight: 700;
+}
+
+.tracker-connector {
+  flex: 1;
+  height: 3px;
+  background: #e2e8f0;
+  margin: 0 4px -16px;
+  position: relative;
+  top: -12px;
+  z-index: 1;
+  transition: background 0.3s;
+}
+
+.tracker-connector.active {
+  background: #10b981;
+}

@@ -73,4 +73,71 @@ export const registerUser = async (name, email, password, role = "Student") => {
   return response.data;
 };
 
+// ============================================================
+// MULTI-AGENT CONTENT AUTOMATION API
+// ============================================================
+
+export const runAgentWorkflow = async (productData) => {
+  const response = await api.post("/api/agents/products", productData);
+  return response.data;
+};
+
+export const listAgentWorkflows = async () => {
+  const response = await api.get("/api/agents/workflows");
+  return response.data;
+};
+
+export const getWorkflowDetails = async (workflowId) => {
+  const response = await api.get(`/api/agents/workflows/${workflowId}`);
+  return response.data;
+};
+
+export const submitManagerApproval = async (workflowId, status, approvedBy, comments) => {
+  const response = await api.post("/api/agents/approve", {
+    workflow_id: workflowId,
+    status,
+    approved_by: approvedBy,
+    comments,
+  });
+  return response.data;
+};
+
+export const publishAgentContent = async (workflowId, channels, scheduledAt = null) => {
+  const response = await api.post("/api/agents/publish", {
+    workflow_id: workflowId,
+    channels,
+    scheduled_at: scheduledAt,
+  });
+  return response.data;
+};
+
+export const getContentIntelligence = async () => {
+  const response = await api.get("/api/agents/intelligence");
+  return response.data;
+};
+
+export const getComplianceRules = async () => {
+  const response = await api.get("/api/agents/compliance-rules");
+  return response.data;
+};
+
+export const updateComplianceRules = async (rules) => {
+  const response = await api.post("/api/agents/compliance-rules", rules);
+  return response.data;
+};
+
+export const listPlatforms = async () => {
+  const response = await api.get("/api/agents/platforms");
+  return response.data;
+};
+
+export const connectPlatform = async (platformId, accountName, credentials = "") => {
+  const response = await api.post("/api/agents/platforms/connect", {
+    platform_id: platformId,
+    account_name: accountName,
+    credentials,
+  });
+  return response.data;
+};
+
 export default api;
