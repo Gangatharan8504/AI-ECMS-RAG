@@ -1,6 +1,7 @@
 /* =========================================================
-   NEW DEDICATED AGENT SIDEBAR (NEXT/DOWN OF PRIMARY SIDEBAR)
-   CLEAN SEPARATION - DOES NOT MIX OR OVERWRITE EXISTING SIDEBAR
+   AGENT STUDIO SECONDARY SIDEBAR
+   ONLY RENDERS WHEN INSIDE /agents ROUTES
+   FLOATING PILL / TRIGGER HAS BEEN COMPLETELY REMOVED
 ========================================================= */
 
 .agent-sidebar-container {
@@ -12,75 +13,9 @@
   top: 0;
 }
 
-/* TRIGGER BUTTON - DOCKED ALONGSIDE PRIMARY SIDEBAR */
-.agent-sidebar-trigger {
-  position: fixed;
-  left: 260px;
-  top: 14px;
-  z-index: 1050;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 8px 14px;
-  border-radius: 30px;
-  cursor: pointer;
-  box-shadow: 0 4px 18px rgba(79, 70, 229, 0.35);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.agent-sidebar-trigger:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 6px 24px rgba(79, 70, 229, 0.45);
-}
-
-.trigger-icon-wrap {
-  width: 24px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sparkle-pulse {
-  animation: pulseRotate 3s infinite linear;
-}
-
-@keyframes pulseRotate {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.15); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
-.trigger-text {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.trigger-badge {
-  font-size: 9px;
-  font-weight: 700;
-  background: #f43f5e;
-  padding: 2px 5px;
-  border-radius: 10px;
-  letter-spacing: 0.5px;
-}
-
-.trigger-text strong {
-  font-size: 13px;
-  letter-spacing: -0.2px;
-}
-
 /* EXPANDABLE DEDICATED AGENT SIDEBAR (240px) */
 .agent-sidebar {
-  width: 0;
-  opacity: 0;
-  pointer-events: none;
+  width: 50px;
   background: #0f172a;
   color: #e2e8f0;
   border-right: 1px solid #1e293b;
@@ -89,15 +24,13 @@
   height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15);
 }
 
 .agent-sidebar.expanded {
   width: 245px;
   min-width: 245px;
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .agent-sidebar-header {
@@ -226,12 +159,4 @@
   background: #10b981;
   border-radius: 50%;
   box-shadow: 0 0 8px #10b981;
-}
-
-@media (max-width: 900px) {
-  .agent-sidebar-trigger {
-    left: auto;
-    right: 14px;
-    top: 70px;
-  }
 }

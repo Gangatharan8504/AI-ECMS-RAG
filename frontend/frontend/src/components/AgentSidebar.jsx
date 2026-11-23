@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   ChevronRight,
   Sparkles,
@@ -16,7 +16,6 @@ import {
   History,
   Sliders,
   PanelLeftClose,
-  PanelLeftOpen,
 } from "lucide-react";
 import "./AgentSidebar.css";
 
@@ -36,28 +35,19 @@ const AGENT_NAV_ITEMS = [
 ];
 
 function AgentSidebar() {
-  const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  // Automatically open when navigating to any /agents route
+  const isAgentRoute = location.pathname.startsWith("/agents");
+  const [collapsed, setCollapsed] = useState(false);
+
+  // If user is on standard ECMS routes (/documents, /assistant, etc.), do NOT show agent sidebar
+  if (!isAgentRoute) {
+    return null;
+  }
 
   return (
-    <div className={`agent-sidebar-container ${isOpen ? "open" : "collapsed"}`}>
-      {/* TRIGGER BUTTON (Sits right on the bottom or edge of primary sidebar) */}
-      <button
-        className="agent-sidebar-trigger"
-        onClick={() => setIsOpen(!isOpen)}
-        title={isOpen ? "Collapse Agent Studio" : "Open Multi-Agent Studio"}
-      >
-        <div className="trigger-icon-wrap">
-          <Sparkles size={16} className="sparkle-pulse" />
-        </div>
-        <div className="trigger-text">
-          <span className="trigger-badge">NEW</span>
-          <strong>Multi-Agent Studio</strong>
-        </div>
-        {isOpen ? <PanelLeftClose size={16} /> : <ChevronRight size={16} className="arrow-pulse" />}
-      </button>
-
-      {/* DEDICATED AGENT WORKFLOW SIDEBAR */}
-      <aside className={`agent-sidebar ${isOpen ? "expanded" : ""}`}>
+    <div className={`agent-sidebar-container ${collapsed ? "collapsed" : "expanded"}`}>
+      <aside className={`agent-sidebar ${collapsed ? "" : "expanded"}`}>
         <div className="agent-sidebar-header">
           <div className="agent-brand">
             <div className="agent-brand-icon">
@@ -70,41 +60,45 @@ function AgentSidebar() {
           </div>
           <button
             className="agent-close-btn"
-            onClick={() => setIsOpen(false)}
-            title="Minimize"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "Expand Studio Nav" : "Collapse"}
           >
-            <PanelLeftClose size={17} />
+            {collapsed ? <ChevronRight size={17} /> : <PanelLeftClose size={17} />}
           </button>
         </div>
 
-        <div className="agent-nav-list">
-          <div className="agent-nav-category">PIPELINE WORKFLOW</div>
-          {AGENT_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.exact}
-                className={({ isActive }) =>
-                  `agent-nav-item ${isActive ? "active" : ""}`
-                }
-              >
-                <div className="agent-icon-box">
-                  <Icon size={16} />
-                </div>
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </div>
+        {!collapsed && (
+          <>
+            <div className="agent-nav-list">
+              <div className="agent-nav-category">PIPELINE WORKFLOW</div>
+              {AGENT_NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.exact}
+                    className={({ isActive }) =>
+                      `agent-nav-item ${isActive ? "active" : ""}`
+                    }
+                  >
+                    <div className="agent-icon-box">
+                      <Icon size={16} />
+                    </div>
+                    <span>{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
 
-        <div className="agent-sidebar-footer">
-          <div className="pipeline-status-badge">
-            <span className="pipeline-dot"></span>
-            <span>Agent Engine v2.0 Ready</span>
-          </div>
-        </div>
+            <div className="agent-sidebar-footer">
+              <div className="pipeline-status-badge">
+                <span className="pipeline-dot"></span>
+                <span>Agent Engine v2.0 Ready</span>
+              </div>
+            </div>
+          </>
+        )}
       </aside>
     </div>
   );
